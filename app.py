@@ -19,7 +19,6 @@ import logging
 import warnings
 import hashlib
 import threading
-import pytz
 warnings.filterwarnings('ignore')
 
 # Configure logging
@@ -40,19 +39,21 @@ class MarketHoursManager:
     """Manage market hours and detect open/closed status"""
     
     def __init__(self):
-        self.ist_timezone = pytz.timezone('Asia/Kolkata')
+        # IST timezone simulation
         self.market_holidays = [
-            # Add major market holidays here
             '2024-01-26', '2024-03-08', '2024-03-25', '2024-04-11', 
             '2024-05-01', '2024-08-15', '2024-10-02', '2024-11-01'
         ]
     
     def get_current_ist_time(self):
-        """Get current IST time"""
-        return datetime.now(self.ist_timezone)
+        """Get current IST time (simulated)"""
+        # Add 5.5 hours to UTC for IST
+        utc_now = datetime.utcnow()
+        ist_now = utc_now + timedelta(hours=5, minutes=30)
+        return ist_now
     
     def is_market_day(self, date=None):
-        """Check if today is a market day (Monday to Friday, excluding holidays)"""
+        """Check if today is a market day"""
         if date is None:
             date = self.get_current_ist_time().date()
         
@@ -89,7 +90,8 @@ class MarketHoursManager:
         
         if not self.is_market_day(current_date):
             if current_date.weekday() >= 5:
-                next_monday = current_date + timedelta(days=(7 - current_date.weekday()))
+                days_to_monday = 7 - current_date.weekday()
+                next_monday = current_date + timedelta(days=days_to_monday)
                 return {
                     'status': 'CLOSED',
                     'reason': 'Weekend',
@@ -936,13 +938,6 @@ def main():
         margin: 1rem 0;
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    .after-hours-analysis {
-        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-        border-left: 6px solid #2196f3;
-        padding: 1.5rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-    }
     .info-box {
         background: #d1ecf1;
         border-left: 6px solid #17a2b8;
@@ -1035,33 +1030,48 @@ def main():
                         st.markdown(f"""
                         <div class="quality-signal">
                             <h3>🔥 {signal['action']} Signal for {selected_stock}</h3>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                                <div><strong>💰 Entry:</strong> ₹{signal['price']:.2f}</div>
-                                <div><strong>🎯 Target:</strong> ₹{signal['target']:.2f}</div>
-                                <div><strong>🛡️ Stop:</strong> ₹{signal['stop_loss']:.2f}</div>
-                            </div>
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                                <div><strong>💪 Confidence:</strong> {signal['confidence']:.0f}%</div>
-                                <div><strong>⭐ Quality:</strong> {signal['quality_score']}/12</div>
-                                <div><strong>📊 R:R:</strong> 1:{abs(signal['target'] - signal['price']) / abs(signal['price'] - signal['stop_loss']):.1f}</div>
-                            </div>
-                            <p><strong>🔍 Why this signal?</strong></p>
-                            <ul>
-                                {''.join([f"<li>{reason}</li>" for reason in signal['reasons']])}
-                            </ul>
                         </div>
                         """, unsafe_allow_html=True)
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("💰 Entry Price", f"₹{signal['price']:.2f}")
+                        with col2:
+                            st.metric("🎯 Target", f"₹{signal['target']:.2f}")
+                        with col3:
+                            st.metric("🛡️ Stop Loss", f"₹{signal['stop_loss']:.2f}")
+                        
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("💪 Confidence", f"{signal['confidence']:.0f}%")
+                        with col2:
+                            st.metric("⭐ Quality Score", f"{signal['quality_score']}/12")
+                        with col3:
+                            risk_reward = abs(signal['target'] - signal['price']) / abs(signal['price'] - signal['stop_loss'])
+                            st.metric("📊 Risk:Reward", f"1:{risk_reward:.1f}")
+                        
+                        st.subheader("🔍 Why this signal?")
+                        for reason in signal['reasons']:
+                            st.write(f"• {reason}")
+                        
+                        st.markdown("---")
                 else:
                     market_condition = results['market_mood'].get('condition', 'Unknown condition')
+                    
                     st.markdown(f"""
                     <div class="info-box">
                         <h4>📊 No Quality Signals for {selected_stock}</h4>
-                        <p><strong>Current Price:</strong> ₹{results['market_mood'].get('current_price', 0):.2f}</p>
-                        <p><strong>Day Change:</strong> {results['market_mood'].get('day_change', 0):.2f}%</p>
-                        <p><strong>Market Condition:</strong> {market_condition}</p>
-                        <p><strong>What this means:</strong> Waiting for high-quality trading setups for this stock.</p>
                     </div>
                     """, unsafe_allow_html=True)
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("💰 Current Price", f"₹{results['market_mood'].get('current_price', 0):.2f}")
+                    with col2:
+                        st.metric("📈 Day Change", f"{results['market_mood'].get('day_change', 0):.2f}%")
+                    
+                    st.write(f"**Market Condition:** {market_condition}")
+                    st.write("**What this means:** Waiting for high-quality trading setups for this stock.")
         
         with tab2:
             st.subheader(f"📊 Detailed Analysis of {selected_stock}")
@@ -1196,82 +1206,56 @@ def main():
                         analysis = st.session_state.trading_system.after_hours_analyzer.analyze_day_performance(market_data, selected_stock)
                         st.session_state.after_hours_analysis = analysis
             
-            # Display after-hours analysis
+            # Display after-hours analysis with clean formatting
             if 'after_hours_analysis' in st.session_state:
                 analysis = st.session_state.after_hours_analysis
                 
                 if 'error' not in analysis:
-# Display after-hours analysis with clean formatting
-st.markdown(f"### {analysis['sentiment_icon']} Today's Performance: {analysis['sentiment']}")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("💰 Current Price", f"₹{analysis['current_price']:.2f}")
-with col2:
-    st.metric("📈 Day Change", f"{analysis['day_change']:.2f}%")
-with col3:
-    st.metric("📊 Week Change", f"{analysis['week_change']:.2f}%")
-
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("🔝 Day High", f"₹{analysis['day_high']:.2f}")
-with col2:
-    st.metric("🔻 Day Low", f"₹{analysis['day_low']:.2f}")
-with col3:
-    st.metric("📊 Volume", f"{analysis['volume_ratio']:.1f}x avg")
-
-st.subheader("🔍 Why did this happen?")
-for reason in analysis['reasons']:
-    st.write(f"• {reason}")
-
-st.subheader("🔮 Tomorrow's Outlook")
-st.write(f"**Bias:** {analysis['next_day_outlook']['bias']} ({analysis['next_day_outlook']['probability']}% probability)")
-st.write(f"**Strategy:** {analysis['next_day_outlook']['strategy']}")
-
-st.subheader("🎯 Key Levels for Tomorrow")
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("🛡️ Support", f"₹{analysis['next_day_outlook']['key_levels']['support']:.2f}")
-with col2:
-    st.metric("🎯 Pivot", f"₹{analysis['next_day_outlook']['key_levels']['pivot']:.2f}")
-with col3:
-    st.metric("🚧 Resistance", f"₹{analysis['next_day_outlook']['key_levels']['resistance']:.2f}")
-
-if analysis['next_day_outlook']['risk_factors']:
-    st.subheader("⚠️ Risk Factors")
-    for risk in analysis['next_day_outlook']['risk_factors']:
-        st.warning(f"• {risk}")
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                            <div><strong>💰 Current Price:</strong> ₹{analysis['current_price']:.2f}</div>
-                            <div><strong>📈 Day Change:</strong> {analysis['day_change']:.2f}%</div>
-                            <div><strong>📊 Week Change:</strong> {analysis['week_change']:.2f}%</div>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
-                            <div><strong>🔝 Day High:</strong> ₹{analysis['day_high']:.2f}</div>
-                            <div><strong>🔻 Day Low:</strong> ₹{analysis['day_low']:.2f}</div>
-                            <div><strong>📊 Volume:</strong> {analysis['volume_ratio']:.1f}x avg</div>
-                        </div>
-                        
-                        <h4>🔍 Why did this happen?</h4>
-                        <ul>
-                            {''.join([f"<li>{reason}</li>" for reason in analysis['reasons']])}
-                        </ul>
-                        
-                        <h4>🔮 Tomorrow's Outlook</h4>
-                        <p><strong>Bias:</strong> {analysis['next_day_outlook']['bias']} 
-                        ({analysis['next_day_outlook']['probability']}% probability)</p>
-                        <p><strong>Strategy:</strong> {analysis['next_day_outlook']['strategy']}</p>
-                        
-                        <h4>🎯 Key Levels for Tomorrow</h4>
-                        <div style="display: flex; justify-content: space-between;">
-                            <div><strong>🛡️ Support:</strong> ₹{analysis['next_day_outlook']['key_levels']['support']:.2f}</div>
-                            <div><strong>🎯 Pivot:</strong> ₹{analysis['next_day_outlook']['key_levels']['pivot']:.2f}</div>
-                            <div><strong>🚧 Resistance:</strong> ₹{analysis['next_day_outlook']['key_levels']['resistance']:.2f}</div>
-                        </div>
-                        
-                        {f"<p><strong>⚠️ Risk Factors:</strong> {', '.join(analysis['next_day_outlook']['risk_factors'])}</p>" if analysis['next_day_outlook']['risk_factors'] else ""}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Performance header
+                    st.markdown(f"### {analysis['sentiment_icon']} Today's Performance: {analysis['sentiment']}")
+                    
+                    # Key metrics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("💰 Current Price", f"₹{analysis['current_price']:.2f}")
+                    with col2:
+                        st.metric("📈 Day Change", f"{analysis['day_change']:.2f}%")
+                    with col3:
+                        st.metric("📊 Week Change", f"{analysis['week_change']:.2f}%")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("🔝 Day High", f"₹{analysis['day_high']:.2f}")
+                    with col2:
+                        st.metric("🔻 Day Low", f"₹{analysis['day_low']:.2f}")
+                    with col3:
+                        st.metric("📊 Volume", f"{analysis['volume_ratio']:.1f}x avg")
+                    
+                    # Reasons analysis
+                    st.subheader("🔍 Why did this happen?")
+                    for reason in analysis['reasons']:
+                        st.write(f"• {reason}")
+                    
+                    # Tomorrow's outlook
+                    st.subheader("🔮 Tomorrow's Outlook")
+                    st.write(f"**Bias:** {analysis['next_day_outlook']['bias']} ({analysis['next_day_outlook']['probability']}% probability)")
+                    st.write(f"**Strategy:** {analysis['next_day_outlook']['strategy']}")
+                    
+                    # Key levels
+                    st.subheader("🎯 Key Levels for Tomorrow")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("🛡️ Support", f"₹{analysis['next_day_outlook']['key_levels']['support']:.2f}")
+                    with col2:
+                        st.metric("🎯 Pivot", f"₹{analysis['next_day_outlook']['key_levels']['pivot']:.2f}")
+                    with col3:
+                        st.metric("🚧 Resistance", f"₹{analysis['next_day_outlook']['key_levels']['resistance']:.2f}")
+                    
+                    # Risk factors
+                    if analysis['next_day_outlook']['risk_factors']:
+                        st.subheader("⚠️ Risk Factors")
+                        for risk in analysis['next_day_outlook']['risk_factors']:
+                            st.warning(f"• {risk}")
                     
                     # Technical levels table
                     st.subheader("📊 Technical Levels")
