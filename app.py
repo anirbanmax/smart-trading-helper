@@ -1201,9 +1201,46 @@ def main():
                 analysis = st.session_state.after_hours_analysis
                 
                 if 'error' not in analysis:
-                    st.markdown(f"""
-                    <div class="after-hours-analysis">
-                        <h3>{analysis['sentiment_icon']} Today's Performance: {analysis['sentiment']}</h3>
+# Display after-hours analysis with clean formatting
+st.markdown(f"### {analysis['sentiment_icon']} Today's Performance: {analysis['sentiment']}")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("💰 Current Price", f"₹{analysis['current_price']:.2f}")
+with col2:
+    st.metric("📈 Day Change", f"{analysis['day_change']:.2f}%")
+with col3:
+    st.metric("📊 Week Change", f"{analysis['week_change']:.2f}%")
+
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("🔝 Day High", f"₹{analysis['day_high']:.2f}")
+with col2:
+    st.metric("🔻 Day Low", f"₹{analysis['day_low']:.2f}")
+with col3:
+    st.metric("📊 Volume", f"{analysis['volume_ratio']:.1f}x avg")
+
+st.subheader("🔍 Why did this happen?")
+for reason in analysis['reasons']:
+    st.write(f"• {reason}")
+
+st.subheader("🔮 Tomorrow's Outlook")
+st.write(f"**Bias:** {analysis['next_day_outlook']['bias']} ({analysis['next_day_outlook']['probability']}% probability)")
+st.write(f"**Strategy:** {analysis['next_day_outlook']['strategy']}")
+
+st.subheader("🎯 Key Levels for Tomorrow")
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("🛡️ Support", f"₹{analysis['next_day_outlook']['key_levels']['support']:.2f}")
+with col2:
+    st.metric("🎯 Pivot", f"₹{analysis['next_day_outlook']['key_levels']['pivot']:.2f}")
+with col3:
+    st.metric("🚧 Resistance", f"₹{analysis['next_day_outlook']['key_levels']['resistance']:.2f}")
+
+if analysis['next_day_outlook']['risk_factors']:
+    st.subheader("⚠️ Risk Factors")
+    for risk in analysis['next_day_outlook']['risk_factors']:
+        st.warning(f"• {risk}")
                         <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
                             <div><strong>💰 Current Price:</strong> ₹{analysis['current_price']:.2f}</div>
                             <div><strong>📈 Day Change:</strong> {analysis['day_change']:.2f}%</div>
